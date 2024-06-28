@@ -5,10 +5,9 @@ import random
 import torch
 
 from model import CNN_MLP
-from train_eval import train_one_epoch, evaluate, create_lr_scheduler, init_distributed_mode, save_on_master, mkdir
-from my_dataset import *
+from train_eval.train_eval_cls import train_one_epoch, evaluate, create_lr_scheduler, init_distributed_mode, save_on_master, mkdir
+from dataset import *
 from torch.utils.tensorboard import SummaryWriter
-import transforms as T
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
