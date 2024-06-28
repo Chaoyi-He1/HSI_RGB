@@ -23,6 +23,8 @@ class CNN_MLP(nn.Module):
 
         self.in_ch = in_ch
         self.num_classes = num_classes
+        
+        self.atten = nn.Parameter(torch.ones(1, in_ch, 1, 1))
 
         self.model = nn.Sequential(
                 ConvBNReLU(in_ch, 64, kernel_size=3),
@@ -37,6 +39,7 @@ class CNN_MLP(nn.Module):
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x * self.atten
         return self.model(x)
 
 

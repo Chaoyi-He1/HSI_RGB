@@ -9,10 +9,12 @@ from collections import defaultdict
 
 
 class Cls_dataset(data.Dataset):
-    def __init__(self, cls_folder: list) -> None:
+    def __init__(self, cls_folder: list, num_cls: int) -> None:
         super().__init__()
         # get all the subfolders in the cls_folder
         self.cls_folder = cls_folder
+        self.num_cls = num_cls
+        
         self.cls_subfolders = [os.path.join(cls_folder, f) for f in os.listdir(cls_folder) if os.path.isdir(os.path.join(cls_folder, f))]
         self.selected_cls_subfolders = ['12', '13', '14']
         
@@ -34,7 +36,9 @@ class Cls_dataset(data.Dataset):
         data = sio.loadmat(data_path)['filtered_img']
         data = np.transpose(data, (2, 0, 1))
         
-        label = sio.loadmat(label_path)['labelnumber']
+        label = sio.loadmat(label_path)['labelnumber'] # 1 x n vector
+        #transfer to one-hot
+        label = np.sum(np.eye(self.num_cls)[label], axis=0).clip(0, 1).astype(np.int)
         
         rgb = sio.loadmat(rgb_path)['img']
         rgb = np.transpose(rgb, (2, 0, 1))
