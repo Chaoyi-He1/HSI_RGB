@@ -1,1 +1,1 @@
-from .dataset import Recover_rgb_dataset, Recover_rgb_dataset
+from .dataset import Recover_rgb_dataset, Cls_dataset

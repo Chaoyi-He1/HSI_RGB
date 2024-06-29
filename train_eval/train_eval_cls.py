@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import utils.misc as utils
 from scipy.ndimage import generic_filter
 from typing import Iterable
+import math
 
 
 def criterion(inputs, target, model):
@@ -33,7 +34,7 @@ def criterion(inputs, target, model):
 
 def train_one_epoch(model: nn.Module, optimizer: torch.optim.Optimizer,
                     data_loader: Iterable, device: torch.device,
-                    epoch: int, print_freq: int = 10, scaler=None):
+                    epoch: int, print_freq: int = 10, scaler=None, in_channels=71):
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
@@ -42,11 +43,14 @@ def train_one_epoch(model: nn.Module, optimizer: torch.optim.Optimizer,
     
     header = 'Epoch: [{}]'.format(epoch)
     all_preds, all_targets = [], []
-    for image, target in metric_logger.log_every(data_loader, print_freq, header):
-        image, target = image.to(device), target.to(device)
+    for image, target, rgb in metric_logger.log_every(data_loader, print_freq, header):
+        image, target, rgb = image.to(device), target.to(device), rgb.to(device)
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             
-            output = model(image)
+            if in_channels != 3:
+                output = model(image)
+            elif in_channels == 3:
+                output = model(rgb)
             loss, accuracy = criterion(output, target, model)
         
             optimizer.zero_grad()
@@ -83,16 +87,19 @@ def train_one_epoch(model: nn.Module, optimizer: torch.optim.Optimizer,
 
 
 def evaluate(model: nn.Module, data_loader: Iterable, device: torch.device,
-             print_freq: int = 10, epoch: int = 0, scaler=None):
+             print_freq: int = 10, epoch: int = 0, scaler=None, in_channels=71):
     model.eval()
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = 'Test:'
     all_preds, all_targets = [], []
-    for image, target in metric_logger.log_every(data_loader, print_freq, header):
-        image, target = image.to(device), target.to(device)
+    for image, target, rgb in metric_logger.log_every(data_loader, print_freq, header):
+        image, target, rgb = image.to(device), target.to(device), rgb.to(device)
         
         with torch.no_grad(), torch.cuda.amp.autocast(enabled=scaler is not None):
-            output = model(image)
+            if in_channels != 3:
+                output = model(image)
+            elif in_channels == 3:
+                output = model(rgb)
             loss, accuracy = criterion(output, target, model)
         
         metric_logger.update(loss=loss.item())
@@ -116,3 +123,28 @@ def evaluate(model: nn.Module, data_loader: Iterable, device: torch.device,
     
     return metric_logger.meters['loss'].global_avg, metric_logger.meters['acc'].global_avg, \
            figs
+           
+
+def create_lr_scheduler(optimizer,
+                        num_step: int,
+                        epochs: int,
+                        warmup=False,
+                        warmup_epochs=1,
+                        warmup_factor=1e-3,
+                        end_factor=1e-6):
+    assert num_step > 0 and epochs > 0
+    if warmup is False:
+        warmup_epochs = 0
+
+    def f(x):
+        if warmup is True and x <= (warmup_epochs * num_step):
+            alpha = float(x) / (warmup_epochs * num_step)
+            # warmup过程中lr倍率因子从warmup_factor -> 1
+            return warmup_factor * (1 - alpha) + alpha
+        else:
+            current_step = (x - warmup_epochs * num_step)
+            cosine_steps = (epochs - warmup_epochs) * num_step
+            # warmup后lr倍率因子从1 -> end_factor
+            return ((1 + math.cos(current_step * math.pi / cosine_steps)) / 2) * (1 - end_factor) + end_factor
+
+    return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=f)

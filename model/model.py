@@ -17,32 +17,6 @@ class ConvBNReLU(nn.Module):
         return self.relu(self.bn(self.conv(x)))
 
 
-class CNN_MLP(nn.Module):
-    def __init__(self, in_ch: int, num_classes: int):
-        super().__init__()
-
-        self.in_ch = in_ch
-        self.num_classes = num_classes
-        
-        self.atten = nn.Parameter(torch.ones(1, in_ch, 1, 1))
-
-        self.model = nn.Sequential(
-                ConvBNReLU(in_ch, 64, kernel_size=3),
-                nn.MaxPool2d(2, stride=2),
-                ConvBNReLU(64, 128, kernel_size=3),
-                nn.MaxPool2d(2, stride=2),
-                ConvBNReLU(128, 512, kernel_size=3),
-                nn.Flatten(),
-                nn.Linear(512 * 7 * 7, 512),
-                nn.ReLU(inplace=True),
-                nn.Linear(512, num_classes)
-            )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x * self.atten
-        return self.model(x)
-
-
 class DoubleConv(nn.Sequential):
     def __init__(self, in_channels, out_channels, mid_channels=None):
         if mid_channels is None:
@@ -133,6 +107,65 @@ class UNet(nn.Module):
         logits = self.out_conv(x)
 
         return logits
+    
+
+class CNN_MLP(nn.Module):
+    def __init__(self, in_ch: int, num_classes: int):
+        super().__init__()
+
+        self.in_ch = in_ch
+        self.num_classes = num_classes
+        
+        if in_ch != 3:
+            self.atten = nn.Parameter(torch.ones(1, in_ch, 1, 1))
+
+        self.model = nn.Sequential(
+                ConvBNReLU(in_ch, 64, kernel_size=3),
+                nn.MaxPool2d(2, stride=2),
+                ConvBNReLU(64, 128, kernel_size=3),
+                nn.MaxPool2d(2, stride=2),
+                ConvBNReLU(128, 512, kernel_size=3),
+                nn.Flatten(),
+                nn.Linear(512 * 7 * 7, 512),
+                nn.ReLU(inplace=True),
+                nn.Linear(512, num_classes)
+            )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.in_ch != 3:
+            x = x * self.atten
+        return self.model(x)
+
+class CNN_rgb_recover(nn.Module):
+    def __init__(self, in_ch: int):
+        super().__init__()
+
+        self.in_ch = in_ch
+        
+        self.atten = nn.Parameter(torch.ones(1, in_ch, 1, 1))
+
+        self.cnn = UNet(in_channels=in_ch, num_classes=128, bilinear=True, base_c=64)
+        
+        def create_rgb_base_layer():
+            return nn.Sequential(
+                nn.Linear(128, 256),
+                nn.ReLU(inplace=True),
+                nn.Linear(256, 512),
+                nn.ReLU(inplace=True),
+                nn.Linear(512, 256),
+            )
+        
+        self.rgb_layer = nn.ModuleList([
+            create_rgb_base_layer(),
+            create_rgb_base_layer(),
+            create_rgb_base_layer()
+        ])
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x * self.atten
+        x = self.cnn(x)
+        rgb_color = [layer(x) for layer in self.rgb_layer]
+        return rgb_color 
 
 
 def convert_onnx(m, save_path):

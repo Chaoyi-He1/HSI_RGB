@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch import Tensor
 import seaborn as sn
 import pandas as pd
 import numpy as np
@@ -7,13 +8,16 @@ from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import utils.misc as utils
 from scipy.ndimage import generic_filter
-from typing import Iterable
+from typing import Iterable, List
+import math
 
 
-def criterion(inputs, target, model):
-    losses = nn.functional.binary_cross_entropy_with_logits(inputs, target) 
+def criterion(inputs: List[Tensor], target, model):
+    # inputs is a list of tensors with shape (B, W, H, 3, 256), for each pixel, the model outputs three 256-dim vectors to predict the RGB values
+    # target is a tensor with shape (B, W, H, 3), the ground truth RGB values
+    losses = [nn.functional.cross_entropy(inputs[..., i, :].permute(0, 3, 1, 2), target[..., i]) for i in range(3)]
     # calculate accuracy for multi-class classification
-    accuracy = torch.mean(inputs.sigmoid().round() == target)
+    accuracy = torch.mean(torch.stack([torch.mean(inputs[..., i].argmax(dim=1) == target[..., i]) for i in range(3)]))
     
     # Return losses with L1_norm if model is in training mode and atten exists
     if model.training and hasattr(model, 'atten'):
@@ -61,25 +65,10 @@ def train_one_epoch(model: nn.Module, optimizer: torch.optim.Optimizer,
         metric_logger.update(loss=loss.item())
         metric_logger.update(acc=accuracy.item())
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
-        
-        all_preds.append(output.sigmoid().round().detach().cpu())
-        all_targets.append(target.detach().cpu())
     
-    all_preds = torch.cat(all_preds, dim=0).numpy()
-    all_targets = torch.cat(all_targets, dim=0).numpy()
-    # all_preds and all_targets are 2D tensor with shape (n, num_classes) with individual class prediction of 0 and 1
-    # calculate TP, FP, TN, FN matrix for each class
-    figs = []
-    for i in range(all_preds.shape[1]):
-        cm = confusion_matrix(all_targets[:, i], all_preds[:, i])
-        df_cm = pd.DataFrame(cm, index=[i for i in range(2)], columns=[i for i in range(2)])
-        plt.figure(figsize=(10, 7))
-        fig = sn.heatmap(df_cm, annot=True).get_figure()
-        figs.append(fig)
-        plt.close()
+    metric_logger.synchronize_between_processes()
     
-    return metric_logger.meters['loss'].global_avg, metric_logger.meters['acc'].global_avg, \
-           figs
+    return metric_logger.meters['loss'].global_avg, metric_logger.meters['acc'].global_avg
 
 
 def evaluate(model: nn.Module, data_loader: Iterable, device: torch.device,
@@ -97,22 +86,32 @@ def evaluate(model: nn.Module, data_loader: Iterable, device: torch.device,
         
         metric_logger.update(loss=loss.item())
         metric_logger.update(acc=accuracy.item())
-        
-        all_preds.append(output.sigmoid().round().detach().cpu())
-        all_targets.append(target.detach().cpu())
     
-    all_preds = torch.cat(all_preds, dim=0).numpy()
-    all_targets = torch.cat(all_targets, dim=0).numpy()
-    # all_preds and all_targets are 2D tensor with shape (n, num_classes) with individual class prediction of 0 and 1
-    # calculate TP, FP, TN, FN matrix for each class
-    figs = []
-    for i in range(all_preds.shape[1]):
-        cm = confusion_matrix(all_targets[:, i], all_preds[:, i])
-        df_cm = pd.DataFrame(cm, index=[i for i in range(2)], columns=[i for i in range(2)])
-        plt.figure(figsize=(10, 7))
-        fig = sn.heatmap(df_cm, annot=True).get_figure()
-        figs.append(fig)
-        plt.close()
+    metric_logger.synchronize_between_processes()
     
-    return metric_logger.meters['loss'].global_avg, metric_logger.meters['acc'].global_avg, \
-           figs
+    return metric_logger.meters['loss'].global_avg, metric_logger.meters['acc'].global_avg
+           
+
+def create_lr_scheduler(optimizer,
+                        num_step: int,
+                        epochs: int,
+                        warmup=False,
+                        warmup_epochs=1,
+                        warmup_factor=1e-3,
+                        end_factor=1e-6):
+    assert num_step > 0 and epochs > 0
+    if warmup is False:
+        warmup_epochs = 0
+
+    def f(x):
+        if warmup is True and x <= (warmup_epochs * num_step):
+            alpha = float(x) / (warmup_epochs * num_step)
+            # warmup过程中lr倍率因子从warmup_factor -> 1
+            return warmup_factor * (1 - alpha) + alpha
+        else:
+            current_step = (x - warmup_epochs * num_step)
+            cosine_steps = (epochs - warmup_epochs) * num_step
+            # warmup后lr倍率因子从1 -> end_factor
+            return ((1 + math.cos(current_step * math.pi / cosine_steps)) / 2) * (1 - end_factor) + end_factor
+
+    return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=f)

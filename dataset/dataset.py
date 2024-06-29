@@ -81,6 +81,6 @@ class Recover_rgb_dataset(data.Dataset):
     def collate_fn(batch: list) -> tuple:
         data, rgb = list(zip(*batch))
         data = torch.stack(data, dtype=torch.float32)
-        rgb = torch.stack(rgb, dtype=torch.float32)
+        rgb = torch.stack(rgb, dtype=torch.float32).long()
         return data, rgb
     
