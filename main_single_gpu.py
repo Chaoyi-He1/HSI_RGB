@@ -217,7 +217,7 @@ if __name__ == "__main__":
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
 
-    parser.add_argument('--print-freq', default=100, type=int, help='print frequency')
+    parser.add_argument('--print-freq', default=50, type=int, help='print frequency')
 
     parser.add_argument('--output-dir', default='./weights/HVI', help='path where to save')
 
