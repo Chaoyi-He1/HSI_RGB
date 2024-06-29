@@ -91,9 +91,9 @@ def main(args):
         
     # create model num_classes equal background + 20 classes
     if args.job_type == 'cls':
-        model = CNN_MLP(in_chans=in_chans, num_classes=num_classes)
+        model = CNN_MLP(in_ch=in_chans, num_classes=num_classes)
     elif args.job_type == 'recover_rgb':
-        model = CNN_rgb_recover(in_chans=in_chans)
+        model = CNN_rgb_recover(in_ch=in_chans)
     model.to(device)
     
     num_parameters, num_layers = sum(p.numel() for p in model.parameters() if p.requires_grad), len(list(model.parameters()))

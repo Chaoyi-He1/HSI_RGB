@@ -34,14 +34,14 @@ class Cls_dataset(data.Dataset):
         rgb_path = self.rgb_paths[index]
         
         data = sio.loadmat(data_path)['filtered_img']
-        data = np.transpose(data, (2, 0, 1))
+        data = torch.from_numpy(np.transpose(data, (2, 0, 1)))
         
         label = sio.loadmat(label_path)['labelnumber'] # 1 x n vector
         #transfer to one-hot
-        label = np.sum(np.eye(self.num_cls)[label], axis=0).clip(0, 1).astype(np.int)
+        label = torch.from_numpy(np.sum(np.eye(self.num_cls)[label], axis=0).clip(0, 1).astype(np.int))
         
         rgb = sio.loadmat(rgb_path)['img']
-        rgb = np.transpose(rgb, (2, 0, 1))
+        rgb = torch.from_numpy(np.transpose(rgb, (2, 0, 1)))
         
         return data, label, rgb
     

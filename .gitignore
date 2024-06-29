@@ -1,1 +1,7 @@
 path/*
+dataset/__pycache__/*
+model/__pycache__/*
+weights/*
+train_eval/__pycache__/*
+utils/__pycache__/*
+runs/*
