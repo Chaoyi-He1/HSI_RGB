@@ -5,3 +5,5 @@ weights/*
 train_eval/__pycache__/*
 utils/__pycache__/*
 runs/*
+*.txt
+*.log

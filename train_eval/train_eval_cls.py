@@ -14,19 +14,19 @@ import math
 def criterion(inputs, target, model):
     losses = nn.functional.binary_cross_entropy_with_logits(inputs, target) 
     # calculate accuracy for multi-class classification
-    accuracy = torch.mean(inputs.sigmoid().round() == target)
+    accuracy = torch.mean((inputs.sigmoid().round() == target).float())
     
     # Return losses with L1_norm if model is in training mode and atten exists
     if model.training and hasattr(model, 'atten'):
         # find the model.atten's top 2 values index, atten is a 1 x channel tensor
-        top_2_idx = torch.topk(model.atten.weight, 2, dim=1)[1]
+        top_2_idx = torch.topk(model.atten, 2, dim=1)[1]
         
-        top_2_vec = torch.zeros_like(model.atten.weight)
+        top_2_vec = torch.zeros_like(model.atten)
         top_2_vec.scatter_(1, top_2_idx, 1)
         
         # let the model.atten's top 2 values to approach 1, and the rest to approach 0
-        L1_norm = 0.6 * (torch.mean(torch.abs(model.atten.weight * (1 - top_2_vec))) + \
-                         torch.mean(torch.abs((1 - model.atten.weight) * top_2_vec)))
+        L1_norm = 0.6 * (torch.mean(torch.abs(model.atten * (1 - top_2_vec))) + \
+                         torch.mean(torch.abs((1 - model.atten) * top_2_vec)))
         losses += L1_norm
         
     return losses, accuracy

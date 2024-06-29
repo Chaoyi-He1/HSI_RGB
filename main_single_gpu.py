@@ -15,7 +15,7 @@ from utils import mkdir
 
 
 def save_weights(model, save_path):
-    atten_weights = model.atten.weight.data
+    atten_weights = model.atten.data
     if not os.path.exists(save_path):
             os.makedirs(save_path)
     save_mtx = atten_weights.cpu().numpy()
@@ -28,14 +28,14 @@ def save_weights(model, save_path):
 def load_conv_weights(model: torch.nn.Module, load_path): 
     # Manually set the weights
     with torch.no_grad():
-        model.atten.weight.fill_(0)
+        model.atten.fill_(0)
         attention_weights = pd.read_csv(load_path, header=None).values
         # find the attention_weights's top 2 values index, atten is a 1 x channel x 1 x 1 tensor
         atten_idx = torch.topk(torch.tensor(attention_weights), 2, dim=1)[1]
         atten_idx = atten_idx.view(-1)
         # let the model.atten's corresponding values to 1, and the rest to 0
-        model.atten.weight.scatter_(1, atten_idx, 1)
-    model.pre_process_conv.weight.requires_grad = False
+        model.atten.scatter_(1, atten_idx, 1)
+    model.atten.requires_grad = False
 
 
 def main(args):
@@ -43,7 +43,7 @@ def main(args):
     print(args)
     # if args.rank in [-1, 0]:
     print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
-    tb_writer = SummaryWriter(log_dir="runs/HSI_drive/9 cls/in_sensor/{}".format(datetime.datetime.now().strftime('%Y%m%d-%H%M%S')))
+    tb_writer = SummaryWriter(log_dir="runs/HVI_cls/{}".format(datetime.datetime.now().strftime('%Y%m%d-%H%M%S')))
 
     device = torch.device(args.device)
 

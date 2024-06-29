@@ -16,7 +16,7 @@ class Cls_dataset(data.Dataset):
         self.num_cls = num_cls
         
         self.cls_subfolders = [os.path.join(cls_folder, f) for f in os.listdir(cls_folder) if os.path.isdir(os.path.join(cls_folder, f))]
-        self.selected_cls_subfolders = ['12', '13', '14']
+        self.selected_cls_subfolders = ['12', '13', '14', '23', '24', '34']
         
         self.cls_subfolders = [f for f in self.cls_subfolders if f.split('/')[-1] in self.selected_cls_subfolders]
         
@@ -36,7 +36,7 @@ class Cls_dataset(data.Dataset):
         data = sio.loadmat(data_path)['filtered_img']
         data = torch.from_numpy(np.transpose(data, (2, 0, 1)))
         
-        label = sio.loadmat(label_path)['labelnumber'] # 1 x n vector
+        label = sio.loadmat(label_path)['labelnumber'].reshape(-1) # 1 x n vector to (n,)
         #transfer to one-hot
         label = torch.from_numpy(np.sum(np.eye(self.num_cls)[label], axis=0).clip(0, 1).astype(np.int))
         
@@ -48,9 +48,9 @@ class Cls_dataset(data.Dataset):
     @staticmethod
     def collate_fn(batch: list) -> tuple:
         data, label, rgb = list(zip(*batch))
-        data = torch.stack(data, dtype=torch.float32)
-        label = torch.stack(label, dtype=torch.int)
-        rgb = torch.stack(rgb, dtype=torch.float32)
+        data = torch.stack(data).to(dtype=torch.float32)
+        label = torch.stack(label).to(dtype=torch.float32)
+        rgb = torch.stack(rgb).to(dtype=torch.int)
         return data, label, rgb
     
     
@@ -80,7 +80,7 @@ class Recover_rgb_dataset(data.Dataset):
     @staticmethod
     def collate_fn(batch: list) -> tuple:
         data, rgb = list(zip(*batch))
-        data = torch.stack(data, dtype=torch.float32)
-        rgb = torch.stack(rgb, dtype=torch.float32).long()
+        data = torch.stack(data)
+        rgb = torch.stack(rgb).long()
         return data, rgb
     
