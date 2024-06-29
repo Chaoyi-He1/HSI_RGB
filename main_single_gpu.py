@@ -15,7 +15,7 @@ from utils import mkdir
 
 
 def save_weights(model, save_path):
-    atten_weights = model.atten.data
+    atten_weights = model.atten.data.view(-1)
     if not os.path.exists(save_path):
             os.makedirs(save_path)
     save_mtx = atten_weights.cpu().numpy()

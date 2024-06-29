@@ -25,8 +25,8 @@ def criterion(inputs, target, model):
         top_2_vec.scatter_(1, top_2_idx, 1)
         
         # let the model.atten's top 2 values to approach 1, and the rest to approach 0
-        L1_norm = 0.6 * (torch.mean(torch.abs(model.atten * (1 - top_2_vec))) + \
-                         torch.mean(torch.abs((1 - model.atten) * top_2_vec)))
+        L1_norm = 0.6 * (torch.sum(torch.abs(model.atten * (1 - top_2_vec))) + \
+                         torch.sum(torch.abs((1 - model.atten) * top_2_vec)))
         losses += L1_norm
         
     return losses, accuracy
