@@ -50,7 +50,7 @@ class Cls_dataset(data.Dataset):
         data, label, rgb = list(zip(*batch))
         data = torch.stack(data).to(dtype=torch.float32)
         label = torch.stack(label).to(dtype=torch.float32)
-        rgb = torch.stack(rgb).to(dtype=torch.int)
+        rgb = torch.stack(rgb).to(dtype=torch.float32)
         return data, label, rgb
     
     

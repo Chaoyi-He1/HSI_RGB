@@ -163,7 +163,7 @@ class CNN_rgb_recover(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x * self.atten
-        x = self.cnn(x)
+        x = self.cnn(x).permute(0, 2, 3, 1)
         rgb_color = [layer(x) for layer in self.rgb_layer]
         return rgb_color 
 

@@ -29,10 +29,9 @@ def load_conv_weights(model: torch.nn.Module, load_path):
     # Manually set the weights
     with torch.no_grad():
         model.atten.fill_(0)
-        attention_weights = pd.read_csv(load_path, header=None).values
+        attention_weights = pd.read_csv(load_path, header=None).values.reshape(1, -1, 1, 1)
         # find the attention_weights's top 2 values index, atten is a 1 x channel x 1 x 1 tensor
-        atten_idx = torch.topk(torch.tensor(attention_weights), 2, dim=1)[1]
-        atten_idx = atten_idx.view(-1)
+        atten_idx = torch.topk(torch.tensor(attention_weights), 1, dim=1)[1]
         # let the model.atten's corresponding values to 1, and the rest to 0
         model.atten.scatter_(1, atten_idx, 1)
     model.atten.requires_grad = False
@@ -43,7 +42,7 @@ def main(args):
     print(args)
     # if args.rank in [-1, 0]:
     print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
-    tb_writer = SummaryWriter(log_dir="runs/HVI_cls/{}".format(datetime.datetime.now().strftime('%Y%m%d-%H%M%S')))
+    tb_writer = SummaryWriter(log_dir="runs/HVI_recover/{}".format(datetime.datetime.now().strftime('%Y%m%d-%H%M%S')))
 
     device = torch.device(args.device)
 
@@ -60,7 +59,8 @@ def main(args):
     print("Creating data loaders")
     # load train data set
     whole_dataset = Cls_dataset(cls_folder=args.data_path, 
-                                num_cls=num_classes)
+                                num_cls=num_classes) if args.job_type == 'cls' else \
+                    Recover_rgb_dataset(recover_folder=args.data_path)
     train_dataset, val_dataset = torch.utils.data.random_split(whole_dataset, [int(len(whole_dataset) * 0.8), len(whole_dataset) - int(len(whole_dataset) * 0.8)])
     
     # if args.distributed:
@@ -94,6 +94,9 @@ def main(args):
         model = CNN_MLP(in_ch=in_chans, num_classes=num_classes)
     elif args.job_type == 'recover_rgb':
         model = CNN_rgb_recover(in_ch=in_chans)
+        
+    # load_conv_weights(model, os.path.join(args.output_dir, 'conv_weights', 'attention_weights.csv'))
+    
     model.to(device)
     
     num_parameters, num_layers = sum(p.numel() for p in model.parameters() if p.requires_grad), len(list(model.parameters()))
@@ -175,8 +178,7 @@ def main(args):
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print('Training time {}'.format(total_time_str))
-    save_weights(model, os.path.join(args.output_dir, 'conv_weights'))
-    # save_conv_weights(model_without_ddp, os.path.join(args.output_dir, 'conv_weights'))
+    # save_weights(model, os.path.join(args.output_dir, 'conv_weights'))
 
 
 if __name__ == "__main__":
@@ -185,13 +187,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=__doc__)
 
-    parser.add_argument('--data_path', default='./path/cls/', help='dataset')
+    parser.add_argument('--data_path', default='./path/RGB_Pixel/', help='dataset')
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')
     
     parser.add_argument('--use_rgb', default=False, type=bool, help='use MF')
     parser.add_argument('--use_HVI', default=True, type=bool, help='use HVI')
     
-    parser.add_argument('--job_type', default='cls', help='job type, cls or recover_rgb')
+    parser.add_argument('--job_type', default='recover_rgb', help='job type, cls or recover_rgb')
 
     parser.add_argument('--device', default='cuda', help='device')
 
@@ -210,7 +212,7 @@ if __name__ == "__main__":
     parser.add_argument('-j', '--workers', default=8, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
 
-    parser.add_argument('--lr', default=0.0001, type=float,
+    parser.add_argument('--lr', default=0.001, type=float,
                         help='initial learning rate')
 
     parser.add_argument('--wd', '--weight-decay', default=0, type=float,
@@ -219,7 +221,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--print-freq', default=50, type=int, help='print frequency')
 
-    parser.add_argument('--output-dir', default='./weights/HVI', help='path where to save')
+    parser.add_argument('--output-dir', default='./weights/recover', help='path where to save')
 
     parser.add_argument('--resume', default='', help='resume from checkpoint')
 

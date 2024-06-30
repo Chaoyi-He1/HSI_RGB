@@ -11,22 +11,25 @@ from typing import Iterable
 import math
 
 
-def criterion(inputs, target, model):
+def criterion(inputs, target, model, epoch):
     losses = nn.functional.binary_cross_entropy_with_logits(inputs, target) 
     # calculate accuracy for multi-class classification
     accuracy = torch.mean((inputs.sigmoid().round() == target).float())
     
     # Return losses with L1_norm if model is in training mode and atten exists
     if model.training and hasattr(model, 'atten'):
-        # find the model.atten's top 2 values index, atten is a 1 x channel tensor
-        top_2_idx = torch.topk(model.atten, 2, dim=1)[1]
-        
-        top_2_vec = torch.zeros_like(model.atten)
-        top_2_vec.scatter_(1, top_2_idx, 1)
-        
-        # let the model.atten's top 2 values to approach 1, and the rest to approach 0
-        L1_norm = 0.6 * (torch.sum(torch.abs(model.atten * (1 - top_2_vec))) + \
-                         torch.sum(torch.abs((1 - model.atten) * top_2_vec)))
+        if epoch < 5:
+            L1_norm = 0.6 * torch.sum(torch.abs(model.atten))
+        else:
+            # find the model.atten's top 2 values index, atten is a 1 x channel tensor
+            top_2_idx = torch.topk(model.atten, 1, dim=1)[1]
+            
+            top_2_vec = torch.zeros_like(model.atten)
+            top_2_vec.scatter_(1, top_2_idx, 1)
+            
+            # let the model.atten's top 2 values to approach 1, and the rest to approach 0
+            L1_norm = 0.6 * (torch.sum(torch.abs(model.atten * (1 - top_2_vec))) + \
+                            torch.sum(torch.abs((1 - model.atten) * top_2_vec)))
         losses += L1_norm
         
     return losses, accuracy
@@ -51,7 +54,7 @@ def train_one_epoch(model: nn.Module, optimizer: torch.optim.Optimizer,
                 output = model(image)
             elif in_channels == 3:
                 output = model(rgb)
-            loss, accuracy = criterion(output, target, model)
+            loss, accuracy = criterion(output, target, model, epoch)
         
             optimizer.zero_grad()
             if scaler is not None:
@@ -100,7 +103,7 @@ def evaluate(model: nn.Module, data_loader: Iterable, device: torch.device,
                 output = model(image)
             elif in_channels == 3:
                 output = model(rgb)
-            loss, accuracy = criterion(output, target, model)
+            loss, accuracy = criterion(output, target, model, epoch)
         
         metric_logger.update(loss=loss.item())
         metric_logger.update(acc=accuracy.item())
