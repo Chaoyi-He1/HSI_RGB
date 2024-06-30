@@ -5,7 +5,7 @@ import random
 import torch
 
 from model import CNN_MLP, CNN_rgb_recover
-from train_eval.train_eval_cls import train_one_epoch, evaluate, create_lr_scheduler
+from train_eval.train_eval_recover_rgb import train_one_epoch, evaluate, create_lr_scheduler
 from dataset import *
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
@@ -199,12 +199,12 @@ if __name__ == "__main__":
 
     parser.add_argument('--num-classes', default=10, type=int, help='num_classes')
 
-    parser.add_argument('-b', '--batch-size', default=128, type=int,
+    parser.add_argument('-b', '--batch-size', default=32, type=int,
                         help='images per gpu, the total batch size is $NGPU x batch_size')
 
     parser.add_argument('--start_epoch', default=0, type=int, help='start epoch')
 
-    parser.add_argument('--epochs', default=20, type=int, metavar='N',
+    parser.add_argument('--epochs', default=200, type=int, metavar='N',
                         help='number of total epochs to run')
 
     parser.add_argument('--sync_bn', type=bool, default=False, help='whether using SyncBatchNorm')
@@ -219,7 +219,7 @@ if __name__ == "__main__":
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
 
-    parser.add_argument('--print-freq', default=50, type=int, help='print frequency')
+    parser.add_argument('--print-freq', default=5, type=int, help='print frequency')
 
     parser.add_argument('--output-dir', default='./weights/recover', help='path where to save')
 

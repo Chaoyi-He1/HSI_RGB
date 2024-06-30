@@ -70,9 +70,9 @@ class Recover_rgb_dataset(data.Dataset):
         rgb_path = self.rgb_paths[index]
         
         data = sio.loadmat(data_path)['filtered_img']
-        data = np.transpose(data, (2, 0, 1))
+        data = torch.from_numpy(np.transpose(data, (2, 0, 1)))
         
-        rgb = sio.loadmat(rgb_path)['img']
+        rgb = torch.from_numpy(sio.loadmat(rgb_path)['imgmat']).round()
         # rgb = np.transpose(rgb, (2, 0, 1))
         
         return data, rgb
@@ -80,7 +80,7 @@ class Recover_rgb_dataset(data.Dataset):
     @staticmethod
     def collate_fn(batch: list) -> tuple:
         data, rgb = list(zip(*batch))
-        data = torch.stack(data)
+        data = torch.stack(data).to(dtype=torch.float32)
         rgb = torch.stack(rgb).long()
         return data, rgb
     

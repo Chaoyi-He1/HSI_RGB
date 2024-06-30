@@ -12,25 +12,28 @@ from typing import Iterable, List
 import math
 
 
-def criterion(inputs: List[Tensor], target, model):
-    # inputs is a list of tensors with shape (B, W, H, 3, 256), for each pixel, the model outputs three 256-dim vectors to predict the RGB values
+def criterion(inputs: List[Tensor], target, model, epoch: int):
+    # inputs is a list of tensors with shape 3 x (B, W, H, 256), for each pixel, the model outputs three 256-dim vectors to predict the RGB values
     # target is a tensor with shape (B, W, H, 3), the ground truth RGB values
-    losses = [nn.functional.cross_entropy(inputs[..., i, :].permute(0, 3, 1, 2), target[..., i]) for i in range(3)]
+    losses = torch.sum(torch.stack([nn.functional.cross_entropy(inputs[i].permute(0, 3, 1, 2), target[..., i]) for i in range(3)]))
     # calculate accuracy for multi-class classification
-    accuracy = torch.mean(torch.stack([torch.mean(inputs[..., i].argmax(dim=1) == target[..., i]) for i in range(3)]))
+    accuracy = torch.mean(torch.stack([torch.mean((inputs[i].argmax(dim=-1) == target[..., i]).to(torch.float32)) for i in range(3)]))
     
     # Return losses with L1_norm if model is in training mode and atten exists
     if model.training and hasattr(model, 'atten'):
-        # find the model.atten's top 2 values index, atten is a 1 x channel tensor
-        top_2_idx = torch.topk(model.atten.weight, 2, dim=1)[1]
-        
-        top_2_vec = torch.zeros_like(model.atten.weight)
-        top_2_vec.scatter_(1, top_2_idx, 1)
-        
-        # let the model.atten's top 2 values to approach 1, and the rest to approach 0
-        L1_norm = 0.6 * (torch.mean(torch.abs(model.atten.weight * (1 - top_2_vec))) + \
-                         torch.mean(torch.abs((1 - model.atten.weight) * top_2_vec)))
-        losses += L1_norm
+        if epoch < 40:
+            L1_norm = 0.6 * torch.sum(torch.abs(model.atten))
+        else:
+            # find the model.atten's top 2 values index, atten is a 1 x channel tensor
+            top_2_idx = torch.topk(model.atten, 2, dim=1)[1]
+            
+            top_2_vec = torch.zeros_like(model.atten)
+            top_2_vec.scatter_(1, top_2_idx, 1)
+            
+            # let the model.atten's top 2 values to approach 1, and the rest to approach 0
+            L1_norm = 0.6 * (torch.mean(torch.abs(model.atten * (1 - top_2_vec))) + \
+                            torch.mean(torch.abs((1 - model.atten) * top_2_vec)))
+            losses += L1_norm
         
     return losses, accuracy
 
@@ -51,7 +54,7 @@ def train_one_epoch(model: nn.Module, optimizer: torch.optim.Optimizer,
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             
             output = model(image)
-            loss, accuracy = criterion(output, target, model)
+            loss, accuracy = criterion(output, target, model,epoch)
         
             optimizer.zero_grad()
             if scaler is not None:
@@ -82,7 +85,7 @@ def evaluate(model: nn.Module, data_loader: Iterable, device: torch.device,
         
         with torch.no_grad(), torch.cuda.amp.autocast(enabled=scaler is not None):
             output = model(image)
-            loss, accuracy = criterion(output, target, model)
+            loss, accuracy = criterion(output, target, model, epoch)
         
         metric_logger.update(loss=loss.item())
         metric_logger.update(acc=accuracy.item())
