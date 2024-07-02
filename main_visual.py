@@ -5,7 +5,7 @@ import random
 import torch
 
 from model import CNN_MLP, CNN_rgb_recover
-from train_eval.train_eval_recover_rgb import train_one_epoch, evaluate, create_lr_scheduler
+from train_eval.train_eval_recover_rgb import train_one_epoch, evaluate, create_lr_scheduler, visualize_rgb_recover
 from dataset import *
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
@@ -40,9 +40,6 @@ def load_conv_weights(model: torch.nn.Module, load_path):
 def main(args):
     # init_distributed_mode(args)
     print(args)
-    # if args.rank in [-1, 0]:
-    print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
-    tb_writer = SummaryWriter(log_dir="runs/HVI_recover/{}".format(datetime.datetime.now().strftime('%Y%m%d-%H%M%S')))
 
     device = torch.device(args.device)
 
@@ -54,31 +51,18 @@ def main(args):
     
     num_classes = args.num_classes
 
-    results_file = "results{}.txt".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-
     print("Creating data loaders")
     # load train data set
     whole_dataset = Cls_dataset(cls_folder=args.data_path, 
                                 num_cls=num_classes) if args.job_type == 'cls' else \
-                    Recover_rgb_dataset(recover_folder=args.data_path)
-    train_dataset, val_dataset = torch.utils.data.random_split(whole_dataset, [int(len(whole_dataset) * 0.8), len(whole_dataset) - int(len(whole_dataset) * 0.8)])
-    
-    # if args.distributed:
-    #     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-    #     test_sampler = torch.utils.data.distributed.DistributedSampler(val_dataset)
-    # else:
-    train_sampler = torch.utils.data.RandomSampler(train_dataset)
-    test_sampler = torch.utils.data.SequentialSampler(val_dataset)
+                    Recover_rgb_dataset_visual(recover_folder=args.data_path)
 
-    train_data_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size,
-        sampler=train_sampler, num_workers=args.workers,
+    data_sampler = torch.utils.data.RandomSampler(whole_dataset)
+
+    whole_data_loader = torch.utils.data.DataLoader(
+        whole_dataset, batch_size=args.batch_size,
+        sampler=data_sampler, num_workers=args.workers,
         collate_fn=whole_dataset.collate_fn, drop_last=True)
-
-    val_data_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=args.batch_size,
-        sampler=test_sampler, num_workers=args.workers,
-        collate_fn=whole_dataset.collate_fn)
 
     print("Creating model")
     
@@ -94,23 +78,15 @@ def main(args):
         model = CNN_MLP(in_ch=in_chans, num_classes=num_classes)
     elif args.job_type == 'recover_rgb':
         model = CNN_rgb_recover(in_ch=in_chans)
-        
-    load_conv_weights(model, os.path.join(args.output_dir, 'conv_weights', 'attention_weights.csv'))
     
-    model.to(device)
+    load_conv_weights(model, os.path.join(args.output_dir, 'conv_weights', 'attention_weights.csv'))
     
     num_parameters, num_layers = sum(p.numel() for p in model.parameters() if p.requires_grad), len(list(model.parameters()))
     print(f"Number of parameters: {num_parameters}, number of layers: {num_layers}")
 
     params_to_optimize = [p for p in model.parameters() if p.requires_grad]
 
-    optimizer = torch.optim.Adam(
-        params_to_optimize,
-        lr=args.lr, weight_decay=args.weight_decay)
-
     scaler = torch.cuda.amp.GradScaler() if args.amp else None
-
-    lr_scheduler = create_lr_scheduler(optimizer, 1, args.epochs, warmup=False)
 
     if args.resume.endswith(".pth"):
         # If map_location is missing, torch.load will first load the module to CPU
@@ -121,61 +97,14 @@ def main(args):
         args.start_epoch = checkpoint['epoch'] + 1
         if args.amp:
             scaler.load_state_dict(checkpoint["scaler"])
+    
+    load_conv_weights(model, os.path.join(args.output_dir, 'conv_weights', 'attention_weights.csv'))
+    model.to(device)
 
     print("Start training")
     start_time = time.time()
-    for epoch in range(args.start_epoch, args.epochs + args.start_epoch):
-        if args.job_type == 'cls':
-            mean_loss, mean_acc, confusion_mtx = train_one_epoch(model, optimizer, train_data_loader, device, epoch,
-                                                                 print_freq=args.print_freq, scaler=scaler, in_channels=in_chans)
-        elif args.job_type == 'recover_rgb':
-            mean_loss, mean_acc, top_5_acc = train_one_epoch(model, optimizer, train_data_loader, device, epoch,
-                                                             print_freq=args.print_freq, scaler=scaler)
-        
-        lr_scheduler.step()
-        
-        if args.job_type == 'cls':
-            loss_val, acc_val, confusion_mtx_val = evaluate(model, val_data_loader, device=device, scaler=scaler, 
-                                                            print_freq=args.print_freq, epoch=epoch, in_channels=in_chans)
-        elif args.job_type == 'recover_rgb':
-            loss_val, acc_val, top_5_acc_val = evaluate(model, val_data_loader, device=device, scaler=scaler, 
-                                                        print_freq=args.print_freq, epoch=epoch)
-
-        # 只在主进程上进行写操作
-        # if args.rank in [-1, 0]:
-        if tb_writer:
-            tags = ['train_loss', 'train_acc', 'val_loss', 'val_acc']
-            values = [mean_loss, mean_acc, loss_val, acc_val]
-            for x, tag in zip(values, tags):
-                tb_writer.add_scalar(tag, x, epoch)
-            # add confusion matrix to tensorboard
-            if args.job_type == 'cls':
-                for i in range(num_classes):
-                    tb_writer.add_figure('confusion_matrix/Class_{}'.format(i), confusion_mtx[i], epoch)
-                    tb_writer.add_figure('confusion_matrix_val/Class_{}'.format(i), confusion_mtx_val[i], epoch)
-            if args.job_type == 'recover_rgb':
-                tb_writer.add_scalar('top_5_acc', top_5_acc, epoch)
-                tb_writer.add_scalar('top_5_acc_val', top_5_acc_val, epoch)
-                
-        # write into txt
-        with open(results_file, "a") as f:
-            # 记录每个epoch对应的train_loss、lr以及验证集各指标
-            train_info = f"[epoch: {epoch}]\n" \
-                            f"train_loss: {mean_loss:.4f}\n"
-            f.write(train_info + "\n\n")
-
-        if args.output_dir:
-            # 只在主节点上执行保存权重操作
-            save_file = {'model': model.state_dict(),
-                         'optimizer': optimizer.state_dict(),
-                         'lr_scheduler': lr_scheduler.state_dict(),
-                         'args': args,
-                         'epoch': epoch}
-            if args.amp:
-                save_file["scaler"] = scaler.state_dict()
-            digits = len(str(args.epochs))
-            torch.save(save_file,
-                       os.path.join(args.output_dir, 'model_{}.pth'.format(str(epoch).zfill(digits))))
+    
+    visualize_rgb_recover(model, whole_data_loader, device=device, scaler=scaler)
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
@@ -225,7 +154,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--output-dir', default='./weights/recover', help='path where to save')
 
-    parser.add_argument('--resume', default='', help='resume from checkpoint')
+    parser.add_argument('--resume', default='./weights/recover/model_499.pth', help='resume from checkpoint')
 
     parser.add_argument(
         "--test-only",

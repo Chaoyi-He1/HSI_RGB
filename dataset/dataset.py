@@ -83,4 +83,36 @@ class Recover_rgb_dataset(data.Dataset):
         data = torch.stack(data).to(dtype=torch.float32)
         rgb = torch.stack(rgb).long()
         return data, rgb
+
+
+class Recover_rgb_dataset_visual(data.Dataset):
+    def __init__(self, recover_folder: str) -> None:
+        super().__init__()
+        self.recover_folder = recover_folder
+        self.data_paths = [os.path.join(recover_folder, f) for f in os.listdir(recover_folder) if f.endswith('.mat') and "HVI" in f]
+        self.data_paths.sort()
+        self.rgb_paths = [f.replace('HVI', 'RGB') for f in self.data_paths]
     
+    def __len__(self) -> int:
+        return len(self.data_paths)
+    
+    def __getitem__(self, index: int) -> tuple:
+        data_path = self.data_paths[index]
+        rgb_path = self.rgb_paths[index]
+        
+        data = sio.loadmat(data_path)['filtered_img']
+        data = torch.from_numpy(np.transpose(data, (2, 0, 1)))
+        
+        rgb = torch.from_numpy(sio.loadmat(rgb_path)['imgmat']).round()
+        # rgb = np.transpose(rgb, (2, 0, 1))
+        
+        img_name = data_path.split('/')[-1].replace('.mat', '')
+        
+        return data, rgb, img_name
+    
+    @staticmethod
+    def collate_fn(batch: list) -> tuple:
+        data, rgb, img_name = list(zip(*batch))
+        data = torch.stack(data).to(dtype=torch.float32)
+        rgb = torch.stack(rgb).long()
+        return data, rgb, img_name
