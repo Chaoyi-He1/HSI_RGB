@@ -23,7 +23,7 @@ def criterion(inputs: List[Tensor], target, model, epoch: int):
     
     #calculate soft accuracy, soft accuracy is the argmax of the model's output located within +- 5 of the ground truth RGB value
     pred_rgb = torch.stack([inputs[i].argmax(dim=-1) for i in range(3)], dim=-1)
-    soft_accuracy = torch.mean(torch.stack([torch.mean(((pred_rgb[..., i] - target[..., i]).abs() <= 5).to(torch.float32)) for i in range(3)]))
+    soft_accuracy = torch.mean(torch.stack([torch.mean(((pred_rgb[..., i] - target[..., i]).abs() <= 3).to(torch.float32)) for i in range(3)]))
     
     # Return losses with L1_norm if model is in training mode and atten exists
     if model.training and hasattr(model, 'atten'):
@@ -31,7 +31,7 @@ def criterion(inputs: List[Tensor], target, model, epoch: int):
             L1_norm = 0.6 * torch.sum(torch.abs(model.atten))
         else:
             # find the model.atten's top 2 values index, atten is a 1 x channel tensor
-            top_2_idx = torch.topk(model.atten, 2, dim=1)[1]
+            top_2_idx = torch.topk(model.atten, 1, dim=1)[1]
             
             top_2_vec = torch.zeros_like(model.atten)
             top_2_vec.scatter_(1, top_2_idx, 1)

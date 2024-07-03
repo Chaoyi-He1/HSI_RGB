@@ -31,7 +31,7 @@ def load_conv_weights(model: torch.nn.Module, load_path):
         model.atten.fill_(0)
         attention_weights = pd.read_csv(load_path, header=None).values.reshape(1, -1, 1, 1)
         # find the attention_weights's top 2 values index, atten is a 1 x channel x 1 x 1 tensor
-        atten_idx = torch.topk(torch.tensor(attention_weights), 2, dim=1)[1]
+        atten_idx = torch.topk(torch.tensor(attention_weights), 1, dim=1)[1]
         # let the model.atten's corresponding values to 1, and the rest to 0
         model.atten.scatter_(1, atten_idx, 1)
     model.atten.requires_grad = False
