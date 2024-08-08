@@ -7,3 +7,4 @@ utils/__pycache__/*
 runs/*
 *.txt
 *.log
+sample_input_mat/*

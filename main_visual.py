@@ -31,7 +31,7 @@ def load_conv_weights(model: torch.nn.Module, load_path):
         model.atten.fill_(0)
         attention_weights = pd.read_csv(load_path, header=None).values.reshape(1, -1, 1, 1)
         # find the attention_weights's top 2 values index, atten is a 1 x channel x 1 x 1 tensor
-        atten_idx = torch.topk(torch.tensor(attention_weights), 1, dim=1)[1]
+        atten_idx = torch.topk(torch.tensor(attention_weights), 2, dim=1)[1]
         # let the model.atten's corresponding values to 1, and the rest to 0
         model.atten.scatter_(1, atten_idx, 1)
     model.atten.requires_grad = False
@@ -60,7 +60,7 @@ def main(args):
     data_sampler = torch.utils.data.RandomSampler(whole_dataset)
 
     whole_data_loader = torch.utils.data.DataLoader(
-        whole_dataset, batch_size=args.batch_size,
+        whole_dataset, batch_size=1,
         sampler=data_sampler, num_workers=args.workers,
         collate_fn=whole_dataset.collate_fn, drop_last=True)
 
@@ -79,7 +79,7 @@ def main(args):
     elif args.job_type == 'recover_rgb':
         model = CNN_rgb_recover(in_ch=in_chans)
     
-    load_conv_weights(model, os.path.join(args.output_dir, 'conv_weights', 'attention_weights.csv'))
+    # load_conv_weights(model, os.path.join(args.output_dir, 'conv_weights', 'attention_weights.csv'))
     
     num_parameters, num_layers = sum(p.numel() for p in model.parameters() if p.requires_grad), len(list(model.parameters()))
     print(f"Number of parameters: {num_parameters}, number of layers: {num_layers}")
@@ -98,7 +98,7 @@ def main(args):
         if args.amp:
             scaler.load_state_dict(checkpoint["scaler"])
     
-    load_conv_weights(model, os.path.join(args.output_dir, 'conv_weights', 'attention_weights.csv'))
+    # load_conv_weights(model, os.path.join(args.output_dir, 'conv_weights', 'attention_weights.csv'))
     model.to(device)
 
     print("Start training")
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=__doc__)
 
-    parser.add_argument('--data_path', default='./path/RGB_Pixel/', help='dataset')
+    parser.add_argument('--data_path', default='./sample_input_mat/', help='dataset')
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')
     
     parser.add_argument('--use_rgb', default=False, type=bool, help='use MF')

@@ -31,7 +31,7 @@ def criterion(inputs: List[Tensor], target, model, epoch: int):
             L1_norm = 0.6 * torch.sum(torch.abs(model.atten))
         else:
             # find the model.atten's top 2 values index, atten is a 1 x channel tensor
-            top_2_idx = torch.topk(model.atten, 1, dim=1)[1]
+            top_2_idx = torch.topk(model.atten, 2, dim=1)[1]
             
             top_2_vec = torch.zeros_like(model.atten)
             top_2_vec.scatter_(1, top_2_idx, 1)
