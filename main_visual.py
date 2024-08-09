@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--output-dir', default='./weights/recover', help='path where to save')
 
-    parser.add_argument('--resume', default='./weights/recover/model_499.pth', help='resume from checkpoint')
+    parser.add_argument('--resume', default='./weights/recover/model_099.pth', help='resume from checkpoint')
 
     parser.add_argument(
         "--test-only",
