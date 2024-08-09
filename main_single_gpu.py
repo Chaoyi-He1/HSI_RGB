@@ -60,7 +60,7 @@ def main(args):
     # load train data set
     whole_dataset = Cls_dataset(cls_folder=args.data_path, 
                                 num_cls=num_classes) if args.job_type == 'cls' else \
-                    Recover_rgb_dataset(recover_folder=args.data_path)
+                    Recover_rgb_dataset(recover_folder=args.data_path, weight_filename="/data/chaoyi_he/HSI/HSI_RGB/path/NMR_Dataset/filtered_rgbWight.mat")
     train_dataset, val_dataset = torch.utils.data.random_split(whole_dataset, [int(len(whole_dataset) * 0.8), len(whole_dataset) - int(len(whole_dataset) * 0.8)])
     
     # if args.distributed:
@@ -189,7 +189,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=__doc__)
 
-    parser.add_argument('--data_path', default='./path/RGB_Pixel/', help='dataset')
+    parser.add_argument('--data_path', default='/data/chaoyi_he/HSI/HSI_RGB/path/NMR_Dataset', help='dataset')
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')
     
     parser.add_argument('--use_rgb', default=False, type=bool, help='use MF')
@@ -206,7 +206,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--start_epoch', default=0, type=int, help='start epoch')
 
-    parser.add_argument('--epochs', default=500, type=int, metavar='N',
+    parser.add_argument('--epochs', default=100, type=int, metavar='N',
                         help='number of total epochs to run')
 
     parser.add_argument('--sync_bn', type=bool, default=False, help='whether using SyncBatchNorm')
@@ -221,7 +221,7 @@ if __name__ == "__main__":
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
 
-    parser.add_argument('--print-freq', default=5, type=int, help='print frequency')
+    parser.add_argument('--print-freq', default=100, type=int, help='print frequency')
 
     parser.add_argument('--output-dir', default='./weights/recover', help='path where to save')
 
