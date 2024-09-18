@@ -16,21 +16,24 @@ def criterion(inputs, target, model, epoch):
     # calculate accuracy for multi-class classification
     accuracy = torch.mean((inputs.sigmoid().round() == target).float())
     
-    # Return losses with L1_norm if model is in training mode and atten exists
-    if model.training and hasattr(model, 'atten'):
-        if epoch < 5:
-            L1_norm = 0.6 * torch.sum(torch.abs(model.atten))
-        else:
-            # find the model.atten's top 2 values index, atten is a 1 x channel tensor
-            top_2_idx = torch.topk(model.atten, 1, dim=1)[1]
+    # # Return losses with L1_norm if model is in training mode and atten exists
+    # if model.training and hasattr(model, 'atten'):
+    #     if epoch < 5:
+    #         L1_norm = 0.6 * torch.sum(torch.abs(model.atten.weight))
+    #     else:
+    #         # self.atten is a conv2d layer with (out_channels=2, in_channels=71, kernel_size=3, padding=1)
+    #         # for each output channel, pick top 2 values from the input channel of each kernel pixel
             
-            top_2_vec = torch.zeros_like(model.atten)
-            top_2_vec.scatter_(1, top_2_idx, 1)
+    #         # find the top 2 values index of each kernel pixel in each channel, atten is a 2 x channel x 3 x 3 tensor
+    #         top_2_idx = torch.topk(torch.abs(model.atten.weight), dim=1, k=2)[1]
             
-            # let the model.atten's top 2 values to approach 1, and the rest to approach 0
-            L1_norm = 0.6 * (torch.sum(torch.abs(model.atten * (1 - top_2_vec))) + \
-                            torch.sum(torch.abs((1 - model.atten) * top_2_vec)))
-        losses += L1_norm
+    #         top_2_vec = torch.zeros_like(model.atten.weight)
+    #         top_2_vec.scatter_(1, top_2_idx, 1)
+            
+    #         # let the model.atten's top 2 values to approach 1, and the rest to approach 0
+    #         L1_norm = 0.6 * (torch.sum(torch.abs(model.atten.weight * (1 - top_2_vec))) + \
+    #                         torch.sum(torch.abs((1 - model.atten.weight) * top_2_vec)))
+    #     losses += L1_norm
         
     return losses, accuracy
 

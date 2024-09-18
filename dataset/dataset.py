@@ -40,7 +40,7 @@ class Cls_dataset(data.Dataset):
         
         label = sio.loadmat(label_path)['labelnumber'].reshape(-1) # 1 x n vector to (n,)
         #transfer to one-hot
-        label = torch.from_numpy(np.sum(np.eye(self.num_cls)[label], axis=0).clip(0, 1).astype(np.int))
+        label = torch.from_numpy(np.sum(np.eye(self.num_cls)[label], axis=0).clip(0, 1).astype(int))
         
         rgb = sio.loadmat(rgb_path)['img']
         rgb = torch.from_numpy(np.transpose(rgb, (2, 0, 1)))

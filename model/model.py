@@ -116,24 +116,33 @@ class CNN_MLP(nn.Module):
         self.in_ch = in_ch
         self.num_classes = num_classes
         
-        if in_ch != 3:
-            self.atten = nn.Parameter(torch.ones(1, in_ch, 1, 1))
+        # if in_ch != 3:
+        #     self.atten = nn.Parameter(torch.ones(1, in_ch, 1, 1))
+        
+        # self.atten = /nn.Conv2d(in_ch, 2, 3, padding=1)
 
         self.model = nn.Sequential(
-                ConvBNReLU(in_ch, 64, kernel_size=3),
+                nn.BatchNorm2d(3),
+                nn.ReLU(inplace=True),
                 nn.MaxPool2d(2, stride=2),
-                ConvBNReLU(64, 128, kernel_size=3),
+                nn.Conv2d(3, 16, 3, padding=1),
+                nn.BatchNorm2d(16),
+                nn.ReLU(inplace=True),
                 nn.MaxPool2d(2, stride=2),
-                ConvBNReLU(128, 512, kernel_size=3),
                 nn.Flatten(),
-                nn.Linear(512 * 7 * 7, 512),
+                nn.Linear(16 * 7 * 7, 512),
+                nn.Dropout(0.4),
+                nn.ReLU(inplace=True),
+                nn.Linear(512, 512),
+                nn.Dropout(0.4),
                 nn.ReLU(inplace=True),
                 nn.Linear(512, num_classes)
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if self.in_ch != 3:
-            x = x * self.atten
+        # if self.in_ch != 3:
+        #     x = x * self.atten
+        # x = self.atten(x)
         return self.model(x)
 
 class CNN_rgb_recover(nn.Module):
